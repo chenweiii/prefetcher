@@ -121,7 +121,7 @@ int main()
     naive_transpose(src, out2, TEST_W, TEST_H);
     assert(1 == equal(out, out2, TEST_W, TEST_H && "Verification(AVX) fails"));
     result = sampling(src, out, avx_transpose);
-    printf("naive: \t\t %ld us\n", result);
+    printf("avx: \t\t %ld us\n", result);
 #endif
 
     free(src);
