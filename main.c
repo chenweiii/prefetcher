@@ -98,12 +98,6 @@ int main()
         for (int x = 0; x < TEST_W; x++)
             *(src + y * TEST_W + x) = rand();
 
-#if SSE_PREFETCH
-    transpose_verify(sse_prefetch_transpose);
-    result = sampling(src, out, sse_prefetch_transpose);
-    printf("sse prefetch: \t %ld us\n", result);
-#endif
-
 #if SSE
     transpose_verify(sse_transpose);
     result = sampling(src, out, sse_transpose);
@@ -122,6 +116,46 @@ int main()
     assert(1 == equal(out, out2, TEST_W, TEST_H && "Verification(AVX) fails"));
     result = sampling(src, out, avx_transpose);
     printf("avx: \t\t %ld us\n", result);
+#endif
+
+    /* Modify *_prefetch argument, following code cannot be used temporarily
+    #if AVX_PREFETCH
+    result = sampling(src, out, avx_prefetch_transpose);
+    printf("avx_prefetch: \t\t %ld us\n", result);
+    #endif
+
+    #if SSE_PREFETCH
+    transpose_verify(sse_prefetch_transpose);
+    result = sampling(src, out, sse_prefetch_transpose);
+    printf("sse prefetch: \t %ld us\n", result);
+    #endif
+    */
+
+#if PLOT
+    FILE *fout = fopen("result.txt", "w");
+    long sse_prefetch_time[32], avx_prefetch_time[32];
+    struct timespec start, end;
+    for(int i = 1; i <= 32; i++) {
+        result = 0;
+        for (int j = 0; j < SAMPLES_NUM; j++) {
+            clock_gettime(CLOCK_REALTIME, &start);
+            sse_prefetch_transpose(src, out, TEST_W, TEST_H, i);
+            clock_gettime(CLOCK_REALTIME, &end);
+            result += diff_in_us(start, end);
+        }
+        sse_prefetch_time[i - 1] = result / SAMPLES_NUM;
+
+        result = 0;
+        for (int j = 0; j < SAMPLES_NUM; j++) {
+            clock_gettime(CLOCK_REALTIME, &start);
+            avx_prefetch_transpose(src, out, TEST_W, TEST_H, i);
+            clock_gettime(CLOCK_REALTIME, &end);
+            result += diff_in_us(start, end);
+        }
+        avx_prefetch_time[i - 1] = result / SAMPLES_NUM;
+        fprintf(fout, "%d %ld %ld\n", i, sse_prefetch_time[i - 1], avx_prefetch_time[i -1]);
+    }
+    fclose(fout);
 #endif
 
     free(src);
