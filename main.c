@@ -10,6 +10,7 @@
 
 #define TEST_W 4096
 #define TEST_H 4096
+#define SAMPLES_NUM 100
 
 /* provide the implementations of naive_transpose,
  * sse_transpose, sse_prefetch_transpose
@@ -62,6 +63,7 @@ static long diff_in_us(struct timespec t1, struct timespec t2)
 int main()
 {
     struct timespec start, end;
+    long result = 0;
     int *src = (int *) memalign(16, sizeof(int) * TEST_W * TEST_H);
     int *out = (int *) memalign(16, sizeof(int) * TEST_W * TEST_H);
 
@@ -72,26 +74,35 @@ int main()
 
 #if SSE_PREFETCH
     transpose_verify(sse_prefetch_transpose);
-    clock_gettime(CLOCK_REALTIME, &start);
-    sse_prefetch_transpose(src, out, TEST_W, TEST_H);
-    clock_gettime(CLOCK_REALTIME, &end);
-    printf("sse prefetch: \t %ld us\n", diff_in_us(start, end));
+    for (int i = 0; i < SAMPLES_NUM; i++) {
+        clock_gettime(CLOCK_REALTIME, &start);
+        sse_prefetch_transpose(src, out, TEST_W, TEST_H);
+        clock_gettime(CLOCK_REALTIME, &end);
+        result += diff_in_us(start, end);
+    }
+    printf("sse prefetch: \t %ld us\n", result / SAMPLES_NUM);
 #endif
 
 #if SSE
     transpose_verify(sse_transpose);
-    clock_gettime(CLOCK_REALTIME, &start);
-    sse_transpose(src, out, TEST_W, TEST_H);
-    clock_gettime(CLOCK_REALTIME, &end);
-    printf("sse: \t\t %ld us\n", diff_in_us(start, end));
+    for (int i = 0; i < SAMPLES_NUM; i++) {
+        clock_gettime(CLOCK_REALTIME, &start);
+        sse_transpose(src, out, TEST_W, TEST_H);
+        clock_gettime(CLOCK_REALTIME, &end);
+        result += diff_in_us(start, end);
+    }
+    printf("sse: \t\t %ld us\n", result / SAMPLES_NUM);
 #endif
 
 #if NAIVE
     transpose_verify(naive_transpose);
-    clock_gettime(CLOCK_REALTIME, &start);
-    naive_transpose(src, out, TEST_W, TEST_H);
-    clock_gettime(CLOCK_REALTIME, &end);
-    printf("naive: \t\t %ld us\n", diff_in_us(start, end));
+    for (int i = 0; i < SAMPLES_NUM; i++) {
+        clock_gettime(CLOCK_REALTIME, &start);
+        naive_transpose(src, out, TEST_W, TEST_H);
+        clock_gettime(CLOCK_REALTIME, &end);
+        result += diff_in_us(start, end);
+    }
+    printf("naive: \t\t %ld us\n", result / SAMPLES_NUM);
 #endif
 
     free(src);
