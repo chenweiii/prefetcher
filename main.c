@@ -4,6 +4,7 @@
 #include <sys/time.h>
 #include <string.h>
 #include <assert.h>
+#include <malloc.h>
 
 #include <xmmintrin.h>
 
@@ -61,8 +62,8 @@ static long diff_in_us(struct timespec t1, struct timespec t2)
 int main()
 {
     struct timespec start, end;
-    int *src = (int *) malloc(sizeof(int) * TEST_W * TEST_H);
-    int *out = (int *) malloc(sizeof(int) * TEST_W * TEST_H);
+    int *src = (int *) memalign(16, sizeof(int) * TEST_W * TEST_H);
+    int *out = (int *) memalign(16, sizeof(int) * TEST_W * TEST_H);
 
     srand(time(NULL));
     for (int y = 0; y < TEST_H; y++)
