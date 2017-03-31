@@ -7,6 +7,7 @@
 #include <malloc.h>
 
 #include <xmmintrin.h>
+#include <immintrin.h>
 
 #define TEST_W 4096
 #define TEST_H 4096
@@ -60,12 +61,37 @@ static long diff_in_us(struct timespec t1, struct timespec t2)
     return (diff.tv_sec * 1000000.0 + diff.tv_nsec / 1000.0);
 }
 
+static long sampling(int *src, int *out, transpose_cb transpose_impl)
+{
+    long result = 0;
+    struct timespec start, end;
+    for (int i = 0; i < SAMPLES_NUM; i++) {
+        clock_gettime(CLOCK_REALTIME, &start);
+        transpose_impl(src, out, TEST_W, TEST_H);
+        clock_gettime(CLOCK_REALTIME, &end);
+        result += diff_in_us(start, end);
+    }
+    return result / SAMPLES_NUM;
+}
+
+/* verify whether this two matrix is identical */
+static int equal(int *a, int *b, int w, int h)
+{
+    for (int x = 0; x < w; x++)
+        for (int y = 0; y < h; y++)
+            if (*(a + x * h + y) != *(b + x * h + y)) {
+                printf("x = %d y = %d\n", x, y);
+                return -1;
+            }
+    return 1;
+}
+
 int main()
 {
-    struct timespec start, end;
     long result = 0;
     int *src = (int *) memalign(16, sizeof(int) * TEST_W * TEST_H);
     int *out = (int *) memalign(16, sizeof(int) * TEST_W * TEST_H);
+    int *out2 = (int *) memalign(16, sizeof(int) * TEST_W * TEST_H);
 
     srand(time(NULL));
     for (int y = 0; y < TEST_H; y++)
@@ -74,39 +100,33 @@ int main()
 
 #if SSE_PREFETCH
     transpose_verify(sse_prefetch_transpose);
-    for (int i = 0; i < SAMPLES_NUM; i++) {
-        clock_gettime(CLOCK_REALTIME, &start);
-        sse_prefetch_transpose(src, out, TEST_W, TEST_H);
-        clock_gettime(CLOCK_REALTIME, &end);
-        result += diff_in_us(start, end);
-    }
-    printf("sse prefetch: \t %ld us\n", result / SAMPLES_NUM);
+    result = sampling(src, out, sse_prefetch_transpose);
+    printf("sse prefetch: \t %ld us\n", result);
 #endif
 
 #if SSE
     transpose_verify(sse_transpose);
-    for (int i = 0; i < SAMPLES_NUM; i++) {
-        clock_gettime(CLOCK_REALTIME, &start);
-        sse_transpose(src, out, TEST_W, TEST_H);
-        clock_gettime(CLOCK_REALTIME, &end);
-        result += diff_in_us(start, end);
-    }
-    printf("sse: \t\t %ld us\n", result / SAMPLES_NUM);
+    result = sampling(src, out, sse_transpose);
+    printf("sse: \t\t %ld us\n", result);
 #endif
 
 #if NAIVE
     transpose_verify(naive_transpose);
-    for (int i = 0; i < SAMPLES_NUM; i++) {
-        clock_gettime(CLOCK_REALTIME, &start);
-        naive_transpose(src, out, TEST_W, TEST_H);
-        clock_gettime(CLOCK_REALTIME, &end);
-        result += diff_in_us(start, end);
-    }
-    printf("naive: \t\t %ld us\n", result / SAMPLES_NUM);
+    result = sampling(src, out, naive_transpose);
+    printf("naive: \t\t %ld us\n", result);
+#endif
+
+#if AVX
+    avx_transpose(src, out, TEST_W, TEST_H);
+    naive_transpose(src, out2, TEST_W, TEST_H);
+    assert(1 == equal(out, out2, TEST_W, TEST_H && "Verification(AVX) fails"));
+    result = sampling(src, out, avx_transpose);
+    printf("naive: \t\t %ld us\n", result);
 #endif
 
     free(src);
     free(out);
+    free(out2);
 
     return 0;
 }
